@@ -3,10 +3,8 @@ package com.example.SecondApi.Controller;
 import com.example.SecondApi.Model.BabyDetailsEntity;
 import com.example.SecondApi.Model.MotherProfileEntity;
 import com.example.SecondApi.Service.EntityService;
-import io.jsonwebtoken.Claims;
-import io.jsonwebtoken.ExpiredJwtException;
-import io.jsonwebtoken.Jwts;
-import io.jsonwebtoken.MalformedJwtException;
+import io.jsonwebtoken.*;
+import io.jsonwebtoken.security.Keys;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.HttpStatus;
@@ -14,7 +12,9 @@ import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 
 
+import java.security.Key;
 import java.time.LocalDateTime;
+import java.util.Arrays;
 import java.util.List;
 import java.util.Map;
 import java.util.stream.Collectors;
@@ -23,7 +23,7 @@ import java.util.stream.Collectors;
 @RequestMapping("/api/entities")
 public class EntityController {
 
-    private static final String SECRET_KEY = "ZXCvbnm"; // My secret key
+    private static final byte[] SECRET_KEY = Keys.secretKeyFor(SignatureAlgorithm.HS256).getEncoded();
 
     @Autowired
     private EntityService entityService;
@@ -34,9 +34,9 @@ public class EntityController {
             @RequestBody Object payload) {
 
         // Validate token
-        /*if (!validateToken(bearerToken)) {
+        if (!validateToken(bearerToken)) {
             return new ResponseEntity<>("Invalid or expired token", HttpStatus.UNAUTHORIZED);
-        }*/
+        }
         if (payload instanceof Map) {
             // Convert the payload Map to MotherProfileEntity
             MotherProfileEntity motherProfile = convertToMotherProfileEntity((Map<?, ?>) payload);
@@ -84,16 +84,54 @@ public class EntityController {
         return babyDetails;
     }
 
-
-   /*private boolean validateToken(String token) {
+    private boolean validateToken(String token) {
         try {
-            Claims claims = Jwts.parser().setSigningKey(SECRET_KEY).parseClaimsJws(token.replace("Bearer ", "")).getBody();
+            // Log the received token for debugging
+            System.out.println("Received token: " + token);
+
+            // Check if the token starts with "Bearer "
+            if (token.startsWith("Bearer ")) {
+                // If yes, remove the "Bearer " prefix
+                token = token.split(" ")[1].trim();
+            }
+
+            // Log the processed token for debugging
+            System.out.println("Processed token: " + token);
+
+            // Split the token parts
+            String[] tokenParts = token.split("\\.");
+            System.out.println("Header: " + tokenParts[0]);
+            System.out.println("Payload: " + tokenParts[1]);
+            System.out.println("Signature: " + tokenParts[2]);
+
+            // Attempt to parse the token and log the claims
+            Jws<Claims> jws = Jwts.parserBuilder().setSigningKey(SECRET_KEY).build().parseClaimsJws(token);
+
+            Claims claims = jws.getBody();
+
+            // Log the claims for debugging
+            System.out.println("Claims: " + claims);
+
+            // Check if the "iss" claim is present and has the expected value
+            String issuer = "Password";
+            if (!claims.getIssuer().equals(issuer)) {
+                return false;
+            }
+
+            // Check if the "pass" claim is present and has the expected value
+            String expectedPass = "QWERTY@123";
+            if (!claims.containsKey("pass") || !claims.get("pass").equals(expectedPass)) {
+                return false;
+            }
 
             return true;
-        } catch (ExpiredJwtException | MalformedJwtException e) {
+        } catch (JwtException e) {
+            // Log the exception for debugging
+            System.out.println("JWT Exception: " + e.getMessage());
             return false;
         }
-    }*/
-}
+    }
 
+
+}
 
